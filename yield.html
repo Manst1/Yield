@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yield</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #6ee7b7, #3b82f6);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow-y: auto;
+      padding: 20px;
+      margin: 0;
+    }
+    .click-button {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #facc15, #f97316);
+      border: 5px solid #fef3c7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #1f2937;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      user-select: none;
+    }
+    .click-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+    .click-button:active {
+      transform: scale(0.95);
+    }
+    .click-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    .counter {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+      color: #fef3c7;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+    .gold-pop {
+      position: absolute;
+      font-size: 1.2rem;
+      color: #facc15;
+      font-weight: bold;
+      pointer-events: none;
+      animation: float 1s ease-out forwards;
+    }
+    .pseudo-gold-pop {
+      color: #fef3c7;
+    }
+    @keyframes float {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-50px); }
+    }
+    .sidebar {
+      position: absolute;
+      left: 20px;
+      top: 80px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 10px;
+      width: 200px;
+    }
+    .upgrade-button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      background: #4b5563;
+      color: #fef3c7;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .upgrade-button:hover {
+      background: #6b7280;
+    }
+    .upgrade-button:disabled {
+      background: #374151;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    .farms {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: grid;
+      grid-template-columns: repeat(22, 40px);
+      gap: 10px;
+      justify-content: center;
+      padding: 0 10px;
+      width: 100vw;
+      box-sizing: border-box;
+    }
+    .farm {
+      width: 40px;
+      height: 40px;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23facc15"><path d="M12 2L1 9h2v7h18V9h2L12 2zm0 2.36L19 9H5l7-4.64zM7 14v-3h10v3H7zm10-5H7V7h10v2z"/></svg>') no-repeat center;
+      background-size: contain;
+    }
+    .stats-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+      max-width: 500px;
+      width: 90%;
+    }
+    .win-screen {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 40px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 3rem;
+      font-weight: bold;
+      color: #facc15;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      display: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="counter" id="counter">
+    Gold: 0<br>Time: 00:00<br>Goal: 150,000 Gold
+  </div>
+  <div class="click-button" id="clickButton">CLICK</div>
+  <div class="sidebar" id="sidebar">
+    <button class="upgrade-button" id="clickUpgrade">Click Power (+1 Gold/Click): 50 Gold</button>
+    <button class="upgrade-button" id="farmUpgrade">Buy Farm (1 Gold/s): 100 Gold</button>
+    <button class="upgrade-button" id="farmPowerUpgrade">Farm Power (+1 Gold/s/Farm): 500 Gold</button>
+    <button class="upgrade-button" id="luckUpgrade">Prospector's Luck (10% Double Gold): 500 Gold</button>
+    <button class="upgrade-button" id="timeUpgrade">Reduce Time (-1 min): 1500 Gold</button>
+    <button class="upgrade-button" id="statsButton">Statistics</button>
+  </div>
+  <div class="farms" id="farms"></div>
+  <div class="stats-panel" id="statsPanel">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Gold Progress Over Time</h2>
+    <canvas id="goldChart"></canvas>
+    <button class="upgrade-button mt-4" id="closeStats">Close</button>
+  </div>
+  <div class="win-screen" id="winScreen"></div>
+  <script>
+    let gold = 0;
+    let pseudoGold = 0;
+    let goldPerClick = 1;
+    let farms = 0;
+    const maxFarms = 110;
+    let farmPower = 1;
+    let luckChance = 0;
+    let timeSeconds = 0;
+    let clickUpgradeCost = 50;
+    let farmCostIndex = 0;
+    const farmCosts = [100, 200, 300, 400, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 12000, 14000, 16000, 18000, 20000, 22000, 24000, 26000, 28000, 30000, 32000, 34000, 36000, 38000, 40000];
+    let farmPowerCostIndex = 0;
+    const farmPowerCosts = [500, 1000, 1500, 2000, 3500, 5000, 8000, 10000, 15000, 20000, 25000];
+    let luckCost = 500;
+    let timeUpgradeCount = 0;
+    const timeUpgradeCosts = [1500, 20000, 40000];
+    let goldHistory = [{ time: 0, gold: 0 }];
+    let lastGoldUpdateTime = 0;
+    let cheatCode = '';
+    const goal = 150000;
+    let lastUpdate = Date.now();
+    let gameEnded = false;
+
+    const counter = document.getElementById('counter');
+    const clickButton = document.getElementById('clickButton');
+    const clickUpgrade = document.getElementById('clickUpgrade');
+    const farmUpgrade = document.getElementById('farmUpgrade');
+    const farmPowerUpgrade = document.getElementById('farmPowerUpgrade');
+    const luckUpgrade = document.getElementById('luckUpgrade');
+    const timeUpgrade = document.getElementById('timeUpgrade');
+    const farmsDiv = document.getElementById('farms');
+    const statsButton = document.getElementById('statsButton');
+    const statsPanel = document.getElementById('statsPanel');
+    const closeStats = document.getElementById('closeStats');
+    const winScreen = document.getElementById('winScreen');
+    const sidebar = document.getElementById('sidebar');
+
+    // Game loop using requestAnimationFrame
+    function gameLoop() {
+      if (gameEnded) return;
+
+      const now = Date.now();
+      const deltaTime = (now - lastUpdate) / 1000; // Time in seconds
+      lastUpdate = now;
+
+      // Update time and passive Gold
+      timeSeconds += deltaTime;
+      if (farms > 0) {
+        gold += farms * farmPower * deltaTime;
+        // Update goldH istory only at whole-second intervals
+        const currentSecond = Math.floor(timeSeconds);
+        if (currentSecond > lastGoldUpdateTime) {
+          goldHistory.push({ time: currentSecond, gold: Math.floor(gold) });
+          lastGoldUpdateTime = currentSecond;
+        }
+      }
+
+      // Check for win condition
+      if (gold >= goal) {
+        endGame();
+      } else {
+        updateCounter();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // End game function
+    function endGame() {
+      gameEnded = true;
+      clickButton.disabled = true;
+      sidebar.style.display = 'none';
+      const minutes = Math.floor(timeSeconds / 60);
+      const seconds = Math.floor(timeSeconds % 60);
+      winScreen.innerHTML = `YOU WON!<br>Your time is ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      winScreen.style.display = 'block';
+      statsPanel.style.display = 'block';
+      chart.data.datasets[0].data = goldHistory;
+      chart.update();
+    }
+
+    // Start game loop
+    lastUpdate = Date.now();
+    requestAnimationFrame(gameLoop);
+
+    // Update counter display
+    function updateCounter() {
+      let counterText = `Gold: ${Math.floor(gold)}<br>`;
+      if (pseudoGold > 0) {
+        counterText += `Pseudo Gold: ${Math.floor(pseudoGold)}<br>`;
+      }
+      const minutes = Math.floor(timeSeconds / 60);
+      const seconds = Math.floor(timeSeconds % 60);
+      counterText += `Time: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}<br>Goal: 150,000 Gold`;
+      counter.innerHTML = counterText;
+      updateButtons();
+    }
+
+    // Update button states
+    function updateButtons() {
+      clickUpgrade.textContent = `Click Power (+1 Gold/Click): ${clickUpgradeCost} Gold`;
+      clickUpgrade.disabled = gold + pseudoGold < clickUpgradeCost || gameEnded;
+      const currentFarmCost = farmCostIndex < farmCosts.length ? farmCosts[farmCostIndex] : farmCosts[farmCosts.length - 1] + 2000 * (farmCostIndex - farmCosts.length + 1);
+      farmUpgrade.textContent = farms >= maxFarms ? `Buy Farm: Maxed` : `Buy Farm (${farmPower} Gold/s): ${currentFarmCost} Gold`;
+      farmUpgrade.disabled = gold + pseudoGold < currentFarmCost || farms >= maxFarms || gameEnded;
+      const farmPowerText = farmPowerCostIndex < farmPowerCosts.length ? `Farm Power (+1 Gold/s/Farm): ${farmPowerCosts[farmPowerCostIndex]} Gold` : `Farm Power: Maxed`;
+      farmPowerUpgrade.textContent = farmPowerText;
+      farmPowerUpgrade.disabled = gold + pseudoGold < farmPowerCosts[farmPowerCostIndex] || farmPowerCostIndex >= farmPowerCosts.length || gameEnded;
+      const luckText = luckChance < 1 ? `Prospector's Luck (+${luckChance === 0 ? 10 : 5}% Double Gold): ${luckCost} Gold` : `Prospector's Luck: Maxed`;
+      luckUpgrade.textContent = luckText;
+      luckUpgrade.disabled = gold + pseudoGold < luckCost || luckChance >= 1 || gameEnded;
+      const timeUpgradeText = timeUpgradeCount < timeUpgradeCosts.length ? `Reduce Time (-1 min): ${timeUpgradeCosts[timeUpgradeCount]} Gold` : `Reduce Time: Maxed`;
+      timeUpgrade.textContent = timeUpgradeText;
+      timeUpgrade.disabled = gold + pseudoGold < timeUpgradeCosts[timeUpgradeCount] || timeUpgradeCount >= timeUpgradeCosts.length || gameEnded;
+      statsButton.disabled = gameEnded;
+    }
+
+    // Click button
+    clickButton.addEventListener('click', () => {
+      if (gameEnded) return;
+      let earnedGold = goldPerClick;
+      if (luckChance > 0 && Math.random() < luckChance) {
+        earnedGold *= 2;
+      }
+      gold += earnedGold;
+      const currentSecond = Math.floor(timeSeconds);
+      if (currentSecond > lastGoldUpdateTime) {
+        goldHistory.push({ time: currentSecond, gold: Math.floor(gold) });
+        lastGoldUpdateTime = currentSecond;
+      }
+      createPopUp(`+${earnedGold} Gold`, 'gold-pop');
+      if (gold >= goal) {
+        endGame();
+      } else {
+        updateCounter();
+      }
+    });
+
+    // Click power upgrade
+    clickUpgrade.addEventListener('click', () => {
+      if (gameEnded) return;
+      if (gold >= clickUpgradeCost) {
+        gold -= clickUpgradeCost;
+      } else {
+        pseudoGold -= clickUpgradeCost;
+      }
+      goldPerClick += 1;
+      clickUpgradeCost += 50;
+      updateCounter();
+    });
+
+    // Farm upgrade
+    farmUpgrade.addEventListener('click', () => {
+      if (gameEnded || farms >= maxFarms) return;
+      const currentFarmCost = farmCostIndex < farmCosts.length ? farmCosts[farmCostIndex] : farmCosts[farmCosts.length - 1] + 2000 * (farmCostIndex - farmCosts.length + 1);
+      if (gold >= currentFarmCost) {
+        gold -= currentFarmCost;
+      } else {
+        pseudoGold -= currentFarmCost;
+      }
+      farms += 1;
+      farmCostIndex += 1;
+      const farm = document.createElement('div');
+      farm.className = 'farm';
+      farmsDiv.appendChild(farm);
+      updateCounter();
+    });
+
+    // Farm power upgrade
+    farmPowerUpgrade.addEventListener('click', () => {
+      if (gameEnded || farmPowerCostIndex >= farmPowerCosts.length) return;
+      if (gold >= farmPowerCosts[farmPowerCostIndex]) {
+        gold -= farmPowerCosts[farmPowerCostIndex];
+      } else {
+        pseudoGold -= farmPowerCosts[farmPowerCostIndex];
+      }
+      farmPower += 1;
+      farmPowerCostIndex += 1;
+      updateCounter();
+    });
+
+    // Luck upgrade
+    luckUpgrade.addEventListener('click', () => {
+      if (gameEnded || luckChance >= 1) return;
+      if (gold >= luckCost) {
+        gold -= luckCost;
+      } else {
+        pseudoGold -= luckCost;
+      }
+      luckChance += luckChance === 0 ? 0.1 : 0.05;
+      luckCost += 100;
+      updateCounter();
+    });
+
+    // Time reduction upgrade
+    timeUpgrade.addEventListener('click', () => {
+      if (gameEnded || timeUpgradeCount >= timeUpgradeCosts.length) return;
+      if (gold >= timeUpgradeCosts[timeUpgradeCount]) {
+        gold -= timeUpgradeCosts[timeUpgradeCount];
+      } else {
+        pseudoGold -= timeUpgradeCosts[timeUpgradeCount];
+      }
+      timeSeconds = Math.max(0, timeSeconds - 60);
+      timeUpgradeCount += 1;
+      updateCounter();
+    });
+
+    // Cheat code
+    document.addEventListener('keydown', (e) => {
+      if (gameEnded) return;
+      cheatCode += e.key;
+      if (cheatCode.length > 6) cheatCode = cheatCode.slice(-6);
+      if (cheatCode === 'uksche') {
+        pseudoGold += 1000000;
+        createPopUp('+1,000,000 Pseudo Gold', 'gold-pop pseudo-gold-pop');
+        updateCounter();
+        cheatCode = '';
+      }
+    });
+
+    // Create pop-up animation
+    function createPopUp(text, className) {
+      const pop = document.createElement('div');
+      pop.className = className;
+      pop.textContent = text;
+      pop.style.left = `${clickButton.offsetLeft + Math.random() * 150 + 25}px`;
+      pop.style.top = `${clickButton.offsetTop + 50}px`;
+      document.body.appendChild(pop);
+      setTimeout(() => pop.remove(), 1000);
+    }
+
+    // Statistics chart
+    const ctx = document.getElementById('goldChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Gold Over Time',
+          data: goldHistory,
+          borderColor: '#facc15',
+          backgroundColor: 'rgba(250, 204, 21, 0.2)',
+          fill: true,
+        }],
+      },
+      options: {
+        parsing: {
+          xAxisKey: 'time',
+          yAxisKey: 'gold',
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            title: { display: true, text: 'Time (s)' },
+            ticks: {
+              callback: function(value) {
+                return Math.floor(value);
+              },
+            },
+          },
+          y: { title: { display: true, text: 'Gold' } },
+        },
+      },
+    });
+
+    statsButton.addEventListener('click', () => {
+      if (gameEnded) return;
+      statsPanel.style.display = 'block';
+      chart.data.datasets[0].data = goldHistory;
+      chart.update();
+    });
+
+    closeStats.addEventListener('click', () => {
+      statsPanel.style.display = 'none';
+    });
+
+    // Handle tab visibility to ensure catch-up with notification
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !gameEnded) {
+        const now = Date.now();
+        const deltaTime = (now - lastUpdate) / 1000;
+        lastUpdate = now;
+        if (farms > 0 && deltaTime > 1) {
+          const earnedGold = Math.floor(farms * farmPower * deltaTime);
+          gold += earnedGold;
+          const currentSecond = Math.floor(timeSeconds);
+          if (currentSecond > lastGoldUpdateTime) {
+            goldHistory.push({ time: currentSecond, gold: Math.floor(gold) });
+            lastGoldUpdateTime = currentSecond;
+          }
+          createPopUp(`+${earnedGold} Gold earned while away`, 'gold-pop');
+          if (gold >= goal) {
+            endGame();
+          } else {
+            updateCounter();
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
